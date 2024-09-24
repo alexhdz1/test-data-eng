@@ -1,0 +1,80 @@
+version: '3.8'
+services:
+  sqlserver:
+    container_name: sqlserver_sucursal_central
+    build:
+      context: .
+      dockerfile: db/Dockerfile
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd!
+    ports:
+      - "1433:1433"
+    networks:
+      - debezium-network
+    volumes:
+      - /tmp/sqlserver_data:/var/opt/mssql/data  # Asegúrate de que esta ruta tenga permisos adecuados y espacio suficiente
+      - ./data:/var/opt/mssql/data/csv  # Volumen para acceder a los CSVs
+    depends_on:
+      - zookeeper
+      - kafka
+    mem_limit: 2g  # Limitar la memoria máxima del contenedor
+    mem_reservation: 1g  # Reservar memoria para asegurar que el contenedor no se quede sin recursos
+    restart: unless-stopped  # Reinicia el contenedor a menos que se detenga manualmente
+
+  zookeeper:
+    container_name: zookeeper_debezium
+    image: confluentinc/cp-zookeeper:7.0.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - debezium-network
+    restart: unless-stopped
+
+  kafka:
+    container_name: kafka_debezium
+    image: confluentinc/cp-kafka:7.0.1
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper_debezium:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka_debezium:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - debezium-network
+    depends_on:
+      - zookeeper
+    restart: unless-stopped
+
+  connect:
+    container_name: connect_debezium
+    image: debezium/connect:1.6
+    environment:
+      - BOOTSTRAP_SERVERS=kafka_debezium:9092
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE=false
+      - CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE=false
+      - CONNECT_REST_ADVERTISED_HOST_NAME=connect_debezium
+      - CONNECT_PLUGIN_PATH=/kafka/connect
+    ports:
+      - "8083:8083"
+    networks:
+      - debezium-network
+    volumes:
+      - ./connectors:/kafka/connect
+    depends_on:
+      - kafka
+    restart: unless-stopped
+
+networks:
+  debezium-network:
+    driver: bridge

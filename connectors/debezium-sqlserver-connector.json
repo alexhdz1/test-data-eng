@@ -1,0 +1,17 @@
+{
+  "name": "debezium-sqlserver-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.sqlserver.SqlServerConnector",
+    "database.hostname": "sqlserver_sucursal_central",
+    "database.port": "1433",
+    "database.user": "SA",
+    "database.password": "YourStrong@Passw0rd!",
+    "database.dbname": "DeaceroDB",
+    "database.server.name": "sqlserver_sucursal_central",
+    "table.include.list": "dbo.Pasajeros,dbo.Vuelos,dbo.CatLineasAereas",
+    "database.history.kafka.bootstrap.servers": "kafka_debezium:9092",
+    "database.history.kafka.topic": "schema-changes.deacero",
+    "include.schema.changes": "true",
+    "snapshot.mode": "initial"
+  }
+}
